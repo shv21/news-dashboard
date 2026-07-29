@@ -4,9 +4,18 @@ from pathlib import Path
 # Base directory of application
 BASE_DIR = Path(__file__).resolve().parent
 
-# Data directory
-DATA_DIR = BASE_DIR / 'data'
-DATA_DIR.mkdir(exist_ok=True)
+# Check if running in Vercel serverless environment
+IS_VERCEL = os.environ.get('VERCEL') == '1' or os.environ.get('VERCEL_ENV') is not None
+
+if IS_VERCEL:
+    DATA_DIR = Path('/tmp/data')
+else:
+    DATA_DIR = BASE_DIR / 'data'
+
+try:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    DATA_DIR = Path('/tmp')
 
 class Config:
     """Central configuration class for Flask and Application modules."""

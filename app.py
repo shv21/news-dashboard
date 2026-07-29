@@ -48,10 +48,12 @@ def create_app(test_config=None):
         logger.error(f"500 Internal Error: {e}")
         return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    # Auto-seed initial news data if DB is empty and not in TESTING mode
+    # Auto-seed initial news data if DB is empty and not in TESTING/VERCEL mode
     with app.app_context():
         try:
-            if not app.config.get('TESTING') and News.query.count() == 0:
+            import os
+            is_vercel = os.environ.get('VERCEL') == '1' or os.environ.get('VERCEL_ENV') is not None
+            if not app.config.get('TESTING') and not is_vercel and News.query.count() == 0:
                 logger.info("Database is empty. Performing initial news scrape on app startup...")
                 manager = ScraperManager()
                 manager.run_all_scrapers()

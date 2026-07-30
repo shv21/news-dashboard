@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent
 IS_VERCEL = os.environ.get('VERCEL') == '1' or os.environ.get('VERCEL_ENV') is not None
 
 if IS_VERCEL:
-    DATA_DIR = Path('/tmp/data')
+    DATA_DIR = Path('/tmp')
 else:
     DATA_DIR = BASE_DIR / 'data'
 

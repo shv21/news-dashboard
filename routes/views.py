@@ -7,10 +7,15 @@ views_bp = Blueprint('views', __name__)
 @views_bp.route('/')
 def index():
     """Renders the main news aggregator dashboard with pre-rendered initial news."""
-    sources = db.session.query(News.source).distinct().all()
-    source_list = [s[0] for s in sources]
-    initial_news = News.query.order_by(News.published_date.desc(), News.id.desc()).limit(9).all()
-    total_count = News.query.count()
+    try:
+        sources = db.session.query(News.source).distinct().all()
+        source_list = [s[0] for s in sources if s[0]]
+        initial_news = News.query.order_by(News.published_date.desc(), News.id.desc()).limit(9).all()
+        total_count = News.query.count()
+    except Exception:
+        source_list = []
+        initial_news = []
+        total_count = 0
     return render_template('index.html', sources=source_list, news=initial_news, total_count=total_count)
 
 @views_bp.route('/article/<int:news_id>')

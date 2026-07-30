@@ -39,7 +39,7 @@ def create_app(test_config=None):
     # Custom 404 Error Handler
     @app.errorhandler(404)
     def page_not_found(e):
-        if app.get_env() == 'development' or app.debug:
+        if app.debug:
             logger.warning(f"404 Error: {e}")
         return render_template('404.html'), 404
 

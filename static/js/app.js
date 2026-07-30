@@ -63,8 +63,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (base.startsWith('/') || (!base.startsWith('http://') && !base.startsWith('https://'))) {
             if (!base.startsWith('/')) base = '/' + base;
             
-            // If running on Live Server or static file, target localhost Flask port 5000
-            if (window.location.protocol === 'file:' || window.location.port !== '5000') {
+            // Only redirect to 127.0.0.1 if running directly off a local file or local dev server (like VS Code Live Server)
+            const isLocalDev = window.location.protocol === 'file:' || 
+                ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') && window.location.port !== '5000');
+
+            if (isLocalDev) {
                 return `${FLASK_SERVER_ORIGIN}${base}`;
             }
             return `${window.location.origin}${base}`;
@@ -171,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="text-danger mb-2"><i class="bi bi-exclamation-triangle display-4"></i></div>
                     <h5 class="text-dark">Unable to load news from API</h5>
                     <p class="text-secondary small max-w-md mx-auto mb-3">${escapeHtml(error.message)}</p>
-                    <p class="text-muted fs-7">Make sure your Flask server is running at <code>http://127.0.0.1:5000</code> by running <code>python app.py</code> in terminal.</p>
+                    <p class="text-muted fs-7">If testing locally, ensure Flask server is running at <code>http://127.0.0.1:5000</code> by running <code>python app.py</code> in terminal.</p>
                 </div>
             `;
             if (emptyState) emptyState.style.display = 'none';

@@ -6,6 +6,10 @@ from scraper.scraper_two import TechCrunchScraper
 from scraper.scraper_three import VergeScraper
 from scraper.scraper_four import WiredScraper
 from scraper.scraper_five import IndiaNewsScraper
+from scraper.scraper_six import CBCNewsScraper
+from scraper.scraper_seven import AustraliaNewsScraper
+from scraper.scraper_eight import GermanyNewsScraper
+from scraper.scraper_nine import JapanNewsScraper
 
 logger = logging.getLogger(__name__)
 
@@ -13,13 +17,17 @@ class ScraperManager:
     """Orchestrates news scrapers, handles database persistence and duplicate prevention."""
 
     def __init__(self):
-        # Register all active scrapers here
+        # Register all active scrapers here across supported countries (US, UK, IN, CA, AU, DE, JP)
         self.scrapers = [
-            BBCNewsScraper(),
-            TechCrunchScraper(),
-            VergeScraper(),
-            WiredScraper(),
-            IndiaNewsScraper()
+            BBCNewsScraper(),        # UK
+            TechCrunchScraper(),     # US
+            VergeScraper(),          # US
+            WiredScraper(),          # US
+            IndiaNewsScraper(),      # IN
+            CBCNewsScraper(),        # CA
+            AustraliaNewsScraper(),  # AU
+            GermanyNewsScraper(),    # DE
+            JapanNewsScraper()       # JP
         ]
 
     def run_all_scrapers(self):

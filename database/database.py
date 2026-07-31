@@ -75,6 +75,38 @@ def seed_fallback_articles(app):
                     article_url="https://theverge.com/clean-energy-transition-europe",
                     image_url="https://images.unsplash.com/photo-1466611653911-95081537e5b7?auto=format&fit=crop&w=600&q=80",
                     country="UK"
+                ),
+                News(
+                    title="Canada Expands Clean Energy Investments in Renewable Infrastructure",
+                    source="CBC News",
+                    summary="Federal funding allocates new resources for hydroelectric power expansion and rural grid modernization in Canada.",
+                    article_url="https://www.cbc.ca/news/canada-clean-energy-investments-2026",
+                    image_url="https://images.unsplash.com/photo-1509391365360-2e959784a276?auto=format&fit=crop&w=600&q=80",
+                    country="CA"
+                ),
+                News(
+                    title="Australia Unveils Major Marine Conservation Initiative for Great Barrier Reef",
+                    source="ABC News Australia",
+                    summary="Environmental authorities commit new research grants to protect coral reef biodiversity against ocean warming.",
+                    article_url="https://www.abc.net.au/news/australia-marine-conservation-reef-2026",
+                    image_url="https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=600&q=80",
+                    country="AU"
+                ),
+                News(
+                    title="Germany Sets Record in Industrial Automation and Robotics Production",
+                    source="DW News",
+                    summary="German manufacturing sectors report strong growth driven by advanced robotic automation and exports.",
+                    article_url="https://www.dw.com/en/germany-robotics-manufacturing-surge-2026",
+                    image_url="https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=600&q=80",
+                    country="DE"
+                ),
+                News(
+                    title="Japan Advances Next-Generation High-Speed Rail Tech",
+                    source="Japan Today",
+                    summary="New maglev prototype achieves record-breaking stability during high-speed tests outside Tokyo.",
+                    article_url="https://japantoday.com/news/japan-maglev-bullet-train-record-2026",
+                    image_url="https://images.unsplash.com/photo-1503899036084-c55cdd92da26?auto=format&fit=crop&w=600&q=80",
+                    country="JP"
                 )
             ]
             db.session.bulk_save_objects(sample_news)

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Article Detail View - News Pulse">
-    <title>Article Detail - News Pulse</title>
+    <title>{{ article.title if article else 'Article Detail' }} - News Pulse</title>
 
     <!-- Google Fonts (Inter) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -16,7 +16,6 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 
     <!-- Custom CSS Stylesheet Links -->
-    <link rel="stylesheet" href="../static/css/style.css">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body class="bg-light text-dark">
@@ -24,7 +23,7 @@
     <!-- Navigation Bar -->
     <nav class="navbar navbar-expand-lg sticky-top custom-navbar">
         <div class="container">
-            <a class="navbar-brand d-flex align-items-center gap-2 fw-bold text-primary" href="index.html">
+            <a class="navbar-brand d-flex align-items-center gap-2 fw-bold text-primary" href="/">
                 <div class="brand-icon">
                     <i class="bi bi-newspaper"></i>
                 </div>
@@ -38,7 +37,7 @@
             <div class="collapse navbar-collapse" id="navbarContent">
                 <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4">
                     <li class="nav-item">
-                        <a class="nav-link active fw-medium" href="index.html">
+                        <a class="nav-link active fw-medium" href="/">
                             <i class="bi bi-house-door me-1"></i> Home
                         </a>
                     </li>
@@ -53,31 +52,47 @@
             <div class="col-lg-9 col-xl-8">
                 <nav aria-label="breadcrumb" class="mb-4">
                     <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="index.html" class="text-decoration-none"><i class="bi bi-arrow-left me-1"></i> Back to News</a></li>
-                        <li class="breadcrumb-item active text-truncate max-w-xs" aria-current="page" id="breadcrumbSource">News Detail</li>
+                        <li class="breadcrumb-item"><a href="/" class="text-decoration-none"><i class="bi bi-arrow-left me-1"></i> Back to News</a></li>
+                        <li class="breadcrumb-item active text-truncate max-w-xs" aria-current="page" id="breadcrumbSource">
+                            {{ article.source if article else 'News Detail' }}
+                        </li>
                     </ol>
                 </nav>
 
                 <article class="bg-white p-4 p-md-5 rounded-4 border shadow-sm mb-4">
                     <div class="d-flex align-items-center gap-2 mb-3">
-                        <span class="badge bg-primary rounded-pill px-3 py-2 fs-7" id="articleSourceBadge">News Source</span>
+                        <span class="badge bg-primary rounded-pill px-3 py-2 fs-7" id="articleSourceBadge">
+                            {{ article.source if article else 'News Source' }}
+                        </span>
+                        {% if article and article.country %}
+                        <span class="badge bg-dark bg-opacity-75 rounded-pill px-2 py-1 fs-7">
+                            {{ article.country }}
+                        </span>
+                        {% endif %}
                         <span class="text-muted small" id="articleDate">
-                            <i class="bi bi-clock me-1"></i> Recently Published
+                            <i class="bi bi-clock me-1"></i> 
+                            {% if article and article.published_date %}
+                                {{ article.published_date.strftime('%B %d, %Y') }}
+                            {% else %}
+                                Recently Published
+                            {% endif %}
                         </span>
                     </div>
 
-                    <h1 class="fw-bold text-dark display-6 mb-4" id="articleTitle">Article Headline</h1>
+                    <h1 class="fw-bold text-dark display-6 mb-4" id="articleTitle">
+                        {{ article.title if article else 'Article Headline' }}
+                    </h1>
 
                     <div class="article-detail-image-wrapper mb-4 rounded-3 overflow-hidden" id="articleImageWrapper">
-                        <img src="https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80" 
-                             alt="Article Image" class="w-100 object-fit-cover" id="articleImage" style="max-height: 420px;" 
-                             onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80';">
+                        <img src="{{ article.image_url if article and article.image_url else 'https://picsum.photos/seed/' ~ (article.id if article else 'default') ~ '/800/420' }}" 
+                             alt="{{ article.title if article else 'Article Image' }}" class="w-100 object-fit-cover" id="articleImage" style="max-height: 420px;" 
+                             onerror="this.onerror=null; this.src='https://picsum.photos/800/420';">
                     </div>
 
                     <div class="article-summary-box p-3 bg-light rounded-3 border-start border-4 border-primary mb-4">
                         <h5 class="fw-semibold text-secondary mb-2"><i class="bi bi-card-text me-2"></i>Summary</h5>
                         <p class="lead text-dark mb-0 fs-6" id="articleSummary" style="line-height: 1.7;">
-                            Summary details loaded directly from news stream.
+                            {{ article.summary if article else 'Summary details loaded directly from news stream.' }}
                         </p>
                     </div>
 
@@ -85,7 +100,7 @@
                         <div class="text-muted small">
                             <i class="bi bi-shield-check text-success me-1"></i> Verified News Source
                         </div>
-                        <a href="#" target="_blank" rel="noopener noreferrer" id="articleOriginalBtn" class="btn btn-primary rounded-pill px-4 py-2 fw-medium">
+                        <a href="{{ article.article_url if article else '#' }}" target="_blank" rel="noopener noreferrer" id="articleOriginalBtn" class="btn btn-primary rounded-pill px-4 py-2 fw-medium">
                             Read Original Story <i class="bi bi-box-arrow-up-right ms-1"></i>
                         </a>
                     </div>
@@ -105,7 +120,5 @@
 
     <!-- Bootstrap 5 JS Bundle CDN -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="../static/js/app.js"></script>
-    <script src="/static/js/app.js"></script>
 </body>
 </html>

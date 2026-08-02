@@ -5,6 +5,7 @@ from database.database import db
 views_bp = Blueprint('views', __name__)
 
 @views_bp.route('/')
+@views_bp.route('/index.html')
 @views_bp.route('/api/index')
 def index():
     """Renders the main news aggregator dashboard with pre-rendered initial news."""

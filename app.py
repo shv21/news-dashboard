@@ -53,8 +53,8 @@ def create_app(test_config=None):
         try:
             import os
             is_vercel = os.environ.get('VERCEL') == '1' or os.environ.get('VERCEL_ENV') is not None
-            if not app.config.get('TESTING') and not is_vercel and News.query.count() == 0:
-                logger.info("Database is empty. Performing initial news scrape on app startup...")
+            if not app.config.get('TESTING') and not is_vercel and News.query.count() <= 10:
+                logger.info("Database contains only fallback seeds. Performing initial news scrape on app startup across all countries...")
                 manager = ScraperManager()
                 manager.run_all_scrapers()
         except Exception as err:

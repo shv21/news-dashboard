@@ -159,9 +159,6 @@ document.addEventListener('DOMContentLoaded', () => {
             state.totalPages = totalPages;
             state.rawArticles = articles;
 
-            // Populate source filter options if sources are found in data
-            updateSourceDropdownOptions(articles);
-
             // Render UI
             renderNews(articles);
             renderPagination(state.page, state.totalPages);
@@ -185,24 +182,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * Update Source Select Dropdown dynamically from fetched items
+     * Fetch & Populate Source Select Dropdown from API endpoint
      */
-    function updateSourceDropdownOptions(articles) {
-        if (!sourceSelect || !articles) return;
-        const currentSelected = sourceSelect.value;
-        
-        const sources = new Set();
-        articles.forEach(art => {
-            const src = (typeof art.source === 'object' && art.source.name) ? art.source.name : art.source;
-            if (src && typeof src === 'string') sources.add(src);
-        });
+    async function loadSourcesList() {
+        if (!sourceSelect) return;
+        const currentSelected = sourceSelect.value || 'all';
+        try {
+            const url = resolveTargetUrl('/api/sources');
+            const res = await fetch(url);
+            const data = await res.json();
 
-        if (sources.size > 0) {
-            let options = `<option value="all" ${currentSelected === 'all' ? 'selected' : ''}>All Sources</option>`;
-            sources.forEach(src => {
-                options += `<option value="${escapeHtml(src)}" ${currentSelected === src ? 'selected' : ''}>${escapeHtml(src)}</option>`;
-            });
-            sourceSelect.innerHTML = options;
+            if (data.success && Array.isArray(data.sources) && data.sources.length > 0) {
+                let options = `<option value="all" ${currentSelected === 'all' ? 'selected' : ''}>All Sources</option>`;
+                data.sources.forEach(srcObj => {
+                    const name = srcObj.name;
+                    if (name) {
+                        options += `<option value="${escapeHtml(name)}" ${currentSelected === name ? 'selected' : ''}>${escapeHtml(name)}</option>`;
+                    }
+                });
+                sourceSelect.innerHTML = options;
+            }
+        } catch (err) {
+            console.error('Error fetching sources list:', err);
         }
     }
 
@@ -371,6 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 showToast(`Scrape complete! Added ${stats.new_added} new articles (${stats.duplicates_skipped} duplicates skipped).`, true);
                 state.page = 1;
                 loadNews();
+                loadSourcesList();
             } else {
                 throw new Error(data.error || 'Scraping failed');
             }
@@ -581,7 +583,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Load initial news & financials on application startup
+    // Load initial news, sources & financials on application startup
     loadNews();
+    loadSourcesList();
     loadFinancials();
 });

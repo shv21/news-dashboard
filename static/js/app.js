@@ -257,15 +257,12 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <i class="bi bi-calendar3"></i> ${dateStr}
                             </div>
                             <h5 class="card-title fw-bold text-dark mb-3 line-clamp-2 title-link">
-                                <a href="${escapeHtml(detailLink)}" target="_blank" class="text-decoration-none text-dark">${escapeHtml(title)}</a>
+                                <a href="${escapeHtml(articleUrl)}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-dark">${escapeHtml(title)}</a>
                             </h5>
                             <p class="card-text text-secondary small line-clamp-3 mb-4 flex-grow-1">
                                 ${escapeHtml(summary)}
                             </p>
-                            <div class="d-flex align-items-center justify-content-between pt-3 border-top gap-2">
-                                <a href="${escapeHtml(detailLink)}" target="_blank" class="btn btn-sm btn-light border rounded-pill px-3">
-                                    Detail
-                                </a>
+                            <div class="d-flex align-items-center justify-content-end pt-3 border-top gap-2">
                                 <a href="${escapeHtml(articleUrl)}" target="_blank" rel="noopener noreferrer" 
                                    class="btn btn-sm btn-primary rounded-pill px-3">
                                     Read Original <i class="bi bi-box-arrow-up-right ms-1"></i>

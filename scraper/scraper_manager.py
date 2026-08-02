@@ -1,4 +1,5 @@
 import logging
+import requests
 from database.database import db
 from database.models import News
 from scraper.scraper_one import BBCNewsScraper
@@ -29,6 +30,19 @@ class ScraperManager:
             GermanyNewsScraper(),    # DE
             JapanNewsScraper()       # JP
         ]
+
+    def is_valid_url(self, url):
+        """Verifies if the article URL does not return HTTP 404."""
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+            }
+            res = requests.head(url, headers=headers, timeout=3, allow_redirects=True)
+            if res.status_code == 404:
+                return False
+            return True
+        except Exception:
+            return True  # If timeout occurs, assume valid to avoid dropping network-throttled feeds
 
     def run_all_scrapers(self):
         """
@@ -67,6 +81,11 @@ class ScraperManager:
                         if art_data.get('image_url') and ('default' in existing.image_url or 'logo' in existing.image_url or existing.image_url == art_data['image_url']):
                             existing.image_url = art_data['image_url']
                         duplicate_count += 1
+                        continue
+
+                    # Validate URL is not returning 404
+                    if not self.is_valid_url(art_data['article_url']):
+                        logger.warning(f"[ScraperManager] Skipping article with 404 URL: {art_data['article_url']}")
                         continue
 
                     new_news = News(

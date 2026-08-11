@@ -129,6 +129,22 @@ class GoogleSheetsService:
             logger.error(f"[GoogleSheets] Failed to fetch existing URLs for duplicate check: {e}")
             return set()
 
+    def classify_category(self, title, summary, url):
+        """Automatically classify article into categories: Sports, Culture & Arts, Technology, Business, Politics, General."""
+        import re
+        text = (title + ' ' + (summary or '') + ' ' + url).lower()
+        if re.search(r'/(sport|sports)/', url) or re.search(r'\b(sport|sports|football|cricket|match|league|olympics|player|stadium|tournament|championship|tennis|golf|f1|premier league|chelsea)\b', text):
+            return 'Sports'
+        if re.search(r'/(culture|entertainment|lifestyle)/', url) or re.search(r'\b(culture|cultural|film|movie|music|art|arts|actor|actress|novel|cinema|festival|theater|theatre|fashion|heritage|celebrity|hollywood|bollywood)\b', text):
+            return 'Culture & Arts'
+        if re.search(r'/(tech|technology|science)/', url) or re.search(r'\b(tech|technology|ai|artificial intelligence|software|hardware|robot|robotics|cyber|space|satellite|gadget)\b', text):
+            return 'Technology'
+        if re.search(r'/(business|economy|finance)/', url) or re.search(r'\b(business|economy|economic|stock|stocks|market|markets|trade|finance|financial|company|inflation|bank|banking|ceo)\b', text):
+            return 'Business'
+        if re.search(r'/(politics|news)/', url) or re.search(r'\b(politics|political|minister|election|parliament|government|president|pm|vote|court|law|diplomacy|military|war)\b', text):
+            return 'Politics'
+        return 'General'
+
     def format_article_row(self, art, scraped_at):
         """Clean and format article dictionary into a neat Google Sheet row."""
         url = art.get('article_url', '').strip()
@@ -141,17 +157,16 @@ class GoogleSheetsService:
         source = art.get('source', 'Unknown')
         title = art.get('title', 'Untitled').strip()
         summary = art.get('summary', '').strip()
-        country = (art.get('country') or '').upper()
 
-        # Clean Category & Author mappings
-        if source == 'BBC News' or country == 'UK':
-            category = 'UK & World News'
-            author = 'BBC Newsroom'
-        elif source == 'Times of India' or country == 'IN':
-            category = 'India News'
-            author = 'TOI Reporter'
+        # Determine dynamic category (Sports, Culture & Arts, Technology, Business, Politics, General)
+        category = art.get('category') or self.classify_category(title, summary, url)
+
+        # Author mapping
+        if source == 'BBC News':
+            author = art.get('author') or 'BBC Newsroom'
+        elif source == 'Times of India':
+            author = art.get('author') or 'TOI Reporter'
         else:
-            category = art.get('category') or 'General'
             author = art.get('author') or source
 
         return [
@@ -164,6 +179,7 @@ class GoogleSheetsService:
             summary,
             scraped_at
         ]
+
 
     def sync_articles(self, articles):
         """Sync list of scraped article dictionaries to Google Sheet."""

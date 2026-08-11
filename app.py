@@ -1,4 +1,7 @@
 import logging
+import os
+import threading
+import time
 from flask import Flask, render_template, jsonify
 from config import Config
 from database.database import init_db, db
@@ -13,6 +16,26 @@ logging.basicConfig(
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+def start_background_scraper(app, interval_seconds=3600):
+    """Background thread worker to scrape news periodically and store forever in DB & Google Sheets."""
+    def run_loop():
+        time.sleep(3)  # Wait 3 seconds after startup for app context initialization
+        while True:
+            try:
+                with app.app_context():
+                    logger.info("[BackgroundScraper] Executing news update cycle...")
+                    manager = ScraperManager()
+                    stats = manager.run_all_scrapers()
+                    logger.info(f"[BackgroundScraper] Finished cycle: {stats['new_added']} new articles added to DB & Google Sheets.")
+            except Exception as e:
+                logger.error(f"[BackgroundScraper] Unexpected error during news update: {e}")
+            
+            time.sleep(interval_seconds)
+
+    thread = threading.Thread(target=run_loop, daemon=True)
+    thread.start()
+    return thread
 
 def create_app(test_config=None):
     """Application factory for Flask News Aggregator."""
@@ -48,19 +71,16 @@ def create_app(test_config=None):
         logger.error(f"500 Internal Error: {e}")
         return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
-    # Auto-seed initial news data if DB is empty and not in TESTING/VERCEL mode
-    with app.app_context():
-        try:
-            import os
-            is_vercel = os.environ.get('VERCEL') == '1' or os.environ.get('VERCEL_ENV') is not None
-            if not app.config.get('TESTING') and not is_vercel and News.query.count() <= 10:
-                logger.info("Database contains only fallback seeds. Performing initial news scrape on app startup across all countries...")
-                manager = ScraperManager()
-                manager.run_all_scrapers()
-        except Exception as err:
-            logger.warning(f"Initial DB check/scrape failed: {err}")
+    # Start automatic background news scraper if not in TESTING/VERCEL mode
+    is_vercel = os.environ.get('VERCEL') == '1' or os.environ.get('VERCEL_ENV') is not None
+    if not app.config.get('TESTING') and not is_vercel:
+        # Only start thread in main process when using Werkzeug reloader
+        if os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug:
+            logger.info("Initializing automatic background news scraper (runs on startup & every 1 hour)...")
+            start_background_scraper(app, interval_seconds=3600)
 
     return app
+
 
 app = create_app()
 

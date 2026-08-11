@@ -1,0 +1,118 @@
+================================================================================
+NEWS PULSE - DATA SOURCES, APIS & SYSTEM ARCHITECTURE DOCUMENTATION
+================================================================================
+
+1. DATA SOURCES & SCRAPED WEBSITES
+--------------------------------------------------------------------------------
+The website automatically collects news from 9 global news publishers across 7 countries:
+
+1. BBC News (United Kingdom 🇬🇧)
+   - Feed URL: http://feeds.bbci.co.uk/news/rss.xml
+   - Country Code: UK
+   - Method: RSS XML parsed via feedparser + BeautifulSoup HTML summary parser.
+
+2. TechCrunch (United States 🇺🇸)
+   - Feed URL: https://techcrunch.com/feed/
+   - Country Code: US
+   - Method: RSS feed with media:content, enclosure, and <img> tag extraction.
+
+3. The Verge (United States 🇺🇸)
+   - Feed URL: https://www.theverge.com/rss/index.xml
+   - Country Code: US
+   - Method: Technology Atom/RSS feed parser with featured image extraction.
+
+4. Wired (United States 🇺🇸)
+   - Feed URL: https://www.wired.com/feed/rss
+   - Country Code: US
+   - Method: Technology & digital culture RSS feed scraper.
+
+5. Times of India (India 🇮🇳)
+   - Feed URL: https://timesofindia.indiatimes.com/rssfeedstopstories.cms
+   - Country Code: IN
+   - Method: RSS feed scraper for Indian & South Asian national headlines.
+
+6. CBC News / Global News (Canada 🇨🇦)
+   - Feed URL: https://globalnews.ca/feed/
+   - Country Code: CA
+   - Method: Canadian breaking news RSS feed scraper.
+
+7. ABC News Australia (Australia 🇦🇺)
+   - Feed URL: https://www.abc.net.au/news/feed/51120/rss.xml
+   - Country Code: AU
+   - Method: Australian national news feed parser.
+
+8. DW News - Deutsche Welle (Germany 🇩🇪)
+   - Feed URL: https://rss.dw.com/xml/rss-en-all
+   - Country Code: DE
+   - Method: European & German international news RSS feed scraper.
+
+9. Japan Today (Japan 🇯🇵)
+   - Feed URL: https://japantoday.com/feed
+   - Country Code: JP
+   - Method: Japanese national and East Asian news feed parser.
+
+FALLBACK IMAGE SOURCES:
+- Unsplash CDN (https://images.unsplash.com)
+- Picsum Photos (https://picsum.photos/seed/{hash}/600/400): Generates deterministic, 
+  100% unique seed fallback images based on the MD5 hash of an article URL/title.
+
+
+2. APIS & ENDPOINT REFERENCE
+--------------------------------------------------------------------------------
+The backend provides the following REST API endpoints:
+
+• GET /api/news
+  Description: Returns paginated news articles from SQLite database.
+  Query Parameters:
+    - page (int): Page number (default: 1)
+    - limit (int): Items per page (default: 9)
+    - source (string): Filter by news publisher (e.g., 'BBC News', 'TechCrunch')
+    - country (string): Filter by country code ('US', 'UK', 'IN', 'CA', 'AU', 'DE', 'JP')
+    - search / q (string): Keyword search matching article titles or summaries
+    - sort (string): Sorting order ('newest' or 'oldest')
+
+• GET /api/news/<id>
+  Description: Retrieves full details of a specific news article by ID.
+
+• GET /api/source/<source_name>
+  Description: Retrieves all articles from a specific publisher.
+
+• GET /api/sources
+  Description: Returns a list of all available news sources with total article counts.
+
+• POST /api/scrape
+  Description: Manually triggers all 9 scrapers to fetch fresh articles, deduplicate entries, 
+               check HTTP link status, and store new items in SQLite.
+
+• GET /api/financials
+  Description: Returns financial market metrics for major banking institutions categorized 
+               by country (Stock Price, Change %, Market Cap, Total Assets, Net Income, CET1 ratio).
+
+
+3. HOW THIS WEBSITE WORKS (ARCHITECTURE & WORKFLOW)
+--------------------------------------------------------------------------------
+A. DATA COLLECTION (Scraper Engine):
+   - Managed by `ScraperManager` in `scraper/scraper_manager.py`.
+   - Executes individual scrapers sequentially (BBC, TechCrunch, The Verge, Wired, 
+     Times of India, Global News, ABC Australia, DW Germany, Japan Today).
+   - Performs requests with custom User-Agent headers, 10s timeouts, and retries.
+   - Cleans HTML markup from text using BeautifulSoup4.
+   - Verifies links using HTTP HEAD requests to filter out broken 404 links.
+
+B. DEDUPLICATION & DATABASE PERSISTENCE:
+   - Database: SQLite file located at `data/news.db` (auto-managed by Flask-SQLAlchemy).
+   - Enforces unique constraints on `article_url` to prevent duplicate articles.
+
+C. BACKEND WEB SERVER & ROUTING:
+   - Built with Python 3 & Flask framework using application factory pattern (`app.py`).
+   - Modular Flask Blueprints: `routes/api.py` (REST API) and `routes/views.py` (Jinja2 HTML rendering).
+   - Auto-seeds DB with initial scrape on first startup if empty.
+   - Enables CORS headers (`Access-Control-Allow-Origin: *`) for frontend integration.
+
+D. FRONTEND USER INTERFACE:
+   - Jinja2 layouts (`templates/base.html`, `templates/index.html`, `templates/article.html`).
+   - Bootstrap 5 & glassmorphism visual styling (`static/css/style.css`).
+   - Controller script `static/js/app.js` manages asynchronous `fetch()` API calls, 
+     live search debouncing (350ms), dropdown filters, pagination, toast notifications, 
+     and bank financial ticker updates.
+================================================================================

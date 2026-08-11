@@ -12,7 +12,7 @@ class BBCNewsScraper:
     """Scraper implementation for BBC News using RSS feed and BeautifulSoup fallback."""
 
     SOURCE_NAME = "BBC News"
-    RSS_URL = "http://feeds.bbci.co.uk/news/rss.xml"
+    RSS_URL = "https://feeds.bbci.co.uk/news/rss.xml"
 
     def __init__(self):
         self.headers = {

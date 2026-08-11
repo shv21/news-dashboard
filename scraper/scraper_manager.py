@@ -3,14 +3,9 @@ import requests
 from database.database import db
 from database.models import News
 from scraper.scraper_one import BBCNewsScraper
-from scraper.scraper_two import TechCrunchScraper
-from scraper.scraper_three import VergeScraper
-from scraper.scraper_four import WiredScraper
 from scraper.scraper_five import IndiaNewsScraper
-from scraper.scraper_six import CBCNewsScraper
-from scraper.scraper_seven import AustraliaNewsScraper
-from scraper.scraper_eight import GermanyNewsScraper
-from scraper.scraper_nine import JapanNewsScraper
+from services.google_sheets_service import GoogleSheetsService
+
 
 logger = logging.getLogger(__name__)
 
@@ -18,18 +13,13 @@ class ScraperManager:
     """Orchestrates news scrapers, handles database persistence and duplicate prevention."""
 
     def __init__(self):
-        # Register all active scrapers here across supported countries (US, UK, IN, CA, AU, DE, JP)
+        # Register only the two requested scrapers: BBC News (UK) and Times of India (IN)
         self.scrapers = [
-            BBCNewsScraper(),        # UK
-            TechCrunchScraper(),     # US
-            VergeScraper(),          # US
-            WiredScraper(),          # US
-            IndiaNewsScraper(),      # IN
-            CBCNewsScraper(),        # CA
-            AustraliaNewsScraper(),  # AU
-            GermanyNewsScraper(),    # DE
-            JapanNewsScraper()       # JP
+            BBCNewsScraper(),        # BBC News (UK)
+            IndiaNewsScraper()       # Times of India (IN)
         ]
+        self.sheets_service = GoogleSheetsService()
+
 
     def is_valid_url(self, url):
         """Verifies if the article URL does not return HTTP 404."""
@@ -46,7 +36,7 @@ class ScraperManager:
 
     def run_all_scrapers(self):
         """
-        Executes all registered scrapers and saves non-duplicate articles to SQLite DB.
+        Executes all registered scrapers and saves non-duplicate articles to SQLite DB and Google Sheets.
         
         Returns:
             dict: Summary statistics of the scraping run.
@@ -109,6 +99,13 @@ class ScraperManager:
 
                 logger.info(f"[ScraperManager] {source_name}: Added {added_count} new articles ({duplicate_count} duplicates skipped).")
 
+                # Sync scraped articles to Google Sheets (non-blocking, failure will not affect website/DB)
+                try:
+                    if articles:
+                        self.sheets_service.sync_articles(articles)
+                except Exception as sheet_err:
+                    logger.error(f"[ScraperManager] Google Sheets sync error for {source_name}: {sheet_err}")
+
             except Exception as e:
                 db.session.rollback()
                 logger.error(f"[ScraperManager] Error executing scraper for {source_name}: {e}", exc_info=True)
@@ -116,3 +113,4 @@ class ScraperManager:
 
         logger.info(f"[ScraperManager] Scraping finished. Total Added: {stats['new_added']}, Total Skipped: {stats['duplicates_skipped']}")
         return stats
+

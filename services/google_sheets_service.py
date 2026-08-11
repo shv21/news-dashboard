@@ -41,15 +41,23 @@ class GoogleSheetsService:
             creds = Credentials.from_service_account_file(credentials_file, scopes=scopes)
             self.client = gspread.authorize(creds)
 
-            # Open spreadsheet by ID if available, otherwise by Name
+            # Open spreadsheet by Name first, or fallback to sheet_id
             try:
-                if sheet_id:
-                    self.sheet = self.client.open_by_key(sheet_id)
-                else:
+                if sheet_name:
                     self.sheet = self.client.open(sheet_name)
+                elif sheet_id:
+                    self.sheet = self.client.open_by_key(sheet_id)
             except gspread.exceptions.SpreadsheetNotFound:
-                logger.error(f"[GoogleSheets] Spreadsheet '{sheet_id or sheet_name}' not found. Please ensure the sheet is shared with Editor access to: {creds.service_account_email}")
-                return
+                if sheet_id:
+                    try:
+                        self.sheet = self.client.open_by_key(sheet_id)
+                    except Exception:
+                        logger.error(f"[GoogleSheets] Spreadsheet '{sheet_name}' not found. Please ensure the sheet is shared with Editor access to: {creds.service_account_email}")
+                        return
+                else:
+                    logger.error(f"[GoogleSheets] Spreadsheet '{sheet_name}' not found. Please ensure the sheet is shared with Editor access to: {creds.service_account_email}")
+                    return
+
             except Exception as e:
                 err_str = str(e)
                 if "drive.googleapis.com" in err_str or "Google Drive API" in err_str:

@@ -19,10 +19,11 @@ class GoogleSheetsService:
         self._init_sheets()
 
     def _init_sheets(self):
-        """Initializes Google Sheets connection using credentials and environment variables."""
         credentials_file = os.environ.get('GOOGLE_CREDENTIALS_FILE', 'credentials.json')
+        sheet_id = os.environ.get('GOOGLE_SHEET_ID', '').strip()
         sheet_name = os.environ.get('GOOGLE_SHEET_NAME', 'My News Data')
         worksheet_name = os.environ.get('GOOGLE_WORKSHEET_NAME', 'News')
+
 
         # Check if credentials file exists
         if not os.path.exists(credentials_file):
@@ -40,15 +41,23 @@ class GoogleSheetsService:
             creds = Credentials.from_service_account_file(credentials_file, scopes=scopes)
             self.client = gspread.authorize(creds)
 
-            # Open spreadsheet
+            # Open spreadsheet by ID if available, otherwise by Name
             try:
-                self.sheet = self.client.open(sheet_name)
+                if sheet_id:
+                    self.sheet = self.client.open_by_key(sheet_id)
+                else:
+                    self.sheet = self.client.open(sheet_name)
             except gspread.exceptions.SpreadsheetNotFound:
-                logger.error(f"[GoogleSheets] Spreadsheet '{sheet_name}' not found. Please create it and share with the service account email.")
+                logger.error(f"[GoogleSheets] Spreadsheet '{sheet_id or sheet_name}' not found. Please ensure the sheet is shared with Editor access to: {creds.service_account_email}")
                 return
             except Exception as e:
-                logger.error(f"[GoogleSheets] Failed to open spreadsheet '{sheet_name}': {e}")
+                err_str = str(e)
+                if "drive.googleapis.com" in err_str or "Google Drive API" in err_str:
+                    logger.error(f"[GoogleSheets] Google Drive API is disabled in your Google Cloud project. Please enable Google Drive API in Google Cloud Console.")
+                else:
+                    logger.error(f"[GoogleSheets] Failed to open spreadsheet '{sheet_name}': {e}")
                 return
+
 
             # Open or create worksheet
             try:

@@ -1,112 +1,147 @@
+"""Germany news scraper module.
+
+Scrapes European and German news headlines from Deutsche Welle (DW News).
+"""
+
+from datetime import datetime
 import logging
-import requests
-import feedparser
-from bs4 import BeautifulSoup
-from datetime import datetime, timezone
 import time
-import hashlib
+from typing import Any, Dict, List, Optional
+
+from bs4 import BeautifulSoup
+import feedparser
+import requests
+
 from config import Config
+from utils import clean_html_text, generate_seed_image_url, parse_datetime
 
 logger = logging.getLogger(__name__)
+
 
 class GermanyNewsScraper:
     """Scraper implementation for DW News (Deutsche Welle - Germany)."""
 
-    SOURCE_NAME = "DW News"
-    RSS_URL = "https://rss.dw.com/xml/rss-en-all"
+    SOURCE_NAME: str = "DW News"
+    RSS_URL: str = Config.RSS_URL_DW_GERMANY
 
-    def __init__(self):
-        self.headers = {
-            'User-Agent': Config.SCRAPER_USER_AGENT,
-            'Accept': 'application/rss+xml, application/xml, text/xml, */*'
+    def __init__(self) -> None:
+        """Initialize GermanyNewsScraper with request headers."""
+        self.headers: Dict[str, str] = {
+            "User-Agent": Config.SCRAPER_USER_AGENT,
+            "Accept": "application/rss+xml, application/xml, text/xml, */*",
         }
 
-    def fetch_feed_content(self, url, max_retries=None, timeout=None):
-        """Fetch feed XML with retry mechanism."""
-        max_retries = max_retries or Config.SCRAPER_MAX_RETRIES
-        timeout = timeout or Config.SCRAPER_REQUEST_TIMEOUT
+    def fetch_feed_content(
+        self,
+        url: str,
+        max_retries: Optional[int] = None,
+        timeout: Optional[int] = None,
+    ) -> Optional[str]:
+        """Fetch feed XML with retry mechanism.
 
-        for attempt in range(1, max_retries + 1):
+        Args:
+            url (str): Target RSS feed URL.
+            max_retries (Optional[int]): Retry limit.
+            timeout (Optional[int]): Request timeout in seconds.
+
+        Returns:
+            Optional[str]: Feed XML text if successful, None otherwise.
+        """
+        retries: int = max_retries or Config.SCRAPER_MAX_RETRIES
+        req_timeout: int = timeout or Config.SCRAPER_REQUEST_TIMEOUT
+
+        for attempt in range(1, retries + 1):
             try:
-                response = requests.get(url, headers=self.headers, timeout=timeout)
+                response = requests.get(
+                    url, headers=self.headers, timeout=req_timeout
+                )
                 response.raise_for_status()
                 return response.text
             except requests.RequestException as e:
-                logger.warning(f"[DW Germany Scraper] Attempt {attempt}/{max_retries} failed: {e}")
-                if attempt < max_retries:
+                logger.warning(
+                    f"[DW Germany Scraper] Attempt {attempt}/{retries} failed: {e}"
+                )
+                if attempt < retries:
                     time.sleep(1 * attempt)
         return None
 
-    def parse_published_date(self, parsed_entry):
-        """Extract and parse publication date into a datetime object."""
-        if hasattr(parsed_entry, 'published_parsed') and parsed_entry.published_parsed:
-            try:
-                return datetime.fromtimestamp(time.mktime(parsed_entry.published_parsed))
-            except Exception:
-                pass
-        return datetime.now(timezone.utc).replace(tzinfo=None)
+    def extract_image_url(
+        self, entry: Any, summary_html: str = "", title: str = ""
+    ) -> str:
+        """Extract image URL from feed enclosures or HTML summary.
 
-    def extract_image_url(self, entry, summary_html="", title=""):
-        """Extract image URL from feed enclosures or HTML summary."""
-        if hasattr(entry, 'media_thumbnail') and entry.media_thumbnail:
-            return entry.media_thumbnail[0].get('url')
-        if hasattr(entry, 'media_content') and entry.media_content:
-            return entry.media_content[0].get('url')
-        if hasattr(entry, 'enclosures') and entry.enclosures:
+        Args:
+            entry (Any): Feed entry object from feedparser.
+            summary_html (str): Summary HTML string.
+            title (str): Article title fallback key.
+
+        Returns:
+            str: Resolved image URL or seed fallback.
+        """
+        if hasattr(entry, "media_thumbnail") and entry.media_thumbnail:
+            return entry.media_thumbnail[0].get("url")
+        if hasattr(entry, "media_content") and entry.media_content:
+            return entry.media_content[0].get("url")
+        if hasattr(entry, "enclosures") and entry.enclosures:
             for enc in entry.enclosures:
-                if enc.get('type', '').startswith('image'):
-                    return enc.get('href') or enc.get('url')
+                if enc.get("type", "").startswith("image"):
+                    return enc.get("href") or enc.get("url")
 
         if summary_html:
-            soup = BeautifulSoup(summary_html, 'html.parser')
-            img_tag = soup.find('img')
-            if img_tag and img_tag.get('src'):
-                return img_tag['src']
+            soup = BeautifulSoup(summary_html, "html.parser")
+            img_tag = soup.find("img")
+            if img_tag and img_tag.get("src"):
+                return img_tag["src"]
 
-        url_hash = hashlib.md5((entry.get('link', '') or title).encode('utf-8')).hexdigest()
-        return f"https://picsum.photos/seed/{url_hash}/600/400"
+        seed_key: str = entry.get("link", "") or title
+        return generate_seed_image_url(seed_key)
 
-    def scrape(self):
-        """Execute news scraping for DW News."""
-        logger.info(f"[DW Germany Scraper] Starting scrape from {self.RSS_URL}")
-        feed_xml = self.fetch_feed_content(self.RSS_URL)
+    def scrape(self) -> List[Dict[str, Any]]:
+        """Execute news scraping for DW News Germany.
+
+        Returns:
+            List[Dict[str, Any]]: List of article dictionaries.
+        """
+        logger.info(
+            f"[DW Germany Scraper] Starting scrape from {self.RSS_URL}"
+        )
+        feed_xml: Optional[str] = self.fetch_feed_content(self.RSS_URL)
         if not feed_xml:
             logger.error("[DW Germany Scraper] Unable to fetch DW RSS feed xml.")
             return []
 
         parsed_feed = feedparser.parse(feed_xml)
-        articles = []
+        articles: List[Dict[str, Any]] = []
 
         for entry in parsed_feed.entries:
             try:
-                title = getattr(entry, 'title', '').strip()
-                article_url = getattr(entry, 'link', '').strip()
-                summary = getattr(entry, 'summary', '').strip()
+                title: str = getattr(entry, "title", "").strip()
+                article_url: str = getattr(entry, "link", "").strip()
+                summary: str = getattr(entry, "summary", "").strip()
 
                 if not title or not article_url:
                     continue
 
-                if summary:
-                    summary_soup = BeautifulSoup(summary, 'html.parser')
-                    summary_text = summary_soup.get_text().strip()
-                else:
-                    summary_text = "No summary available."
+                summary_text: str = clean_html_text(summary)
+                pub_date: datetime = parse_datetime(entry)
+                image_url: str = self.extract_image_url(entry, summary, title)
 
-                pub_date = self.parse_published_date(entry)
-                image_url = self.extract_image_url(entry, summary, title)
-
-                articles.append({
-                    'title': title,
-                    'source': self.SOURCE_NAME,
-                    'published_date': pub_date,
-                    'summary': summary_text[:500],
-                    'image_url': image_url,
-                    'article_url': article_url,
-                    'country': 'DE'
-                })
+                articles.append(
+                    {
+                        "title": title,
+                        "source": self.SOURCE_NAME,
+                        "published_date": pub_date,
+                        "summary": summary_text[:500],
+                        "image_url": image_url,
+                        "article_url": article_url,
+                        "country": "DE",
+                    }
+                )
             except Exception as e:
                 logger.error(f"[DW Germany Scraper] Error parsing entry: {e}")
                 continue
 
-        logger.info(f"[DW Germany Scraper] Successfully extracted {len(articles)} articles.")
+        logger.info(
+            f"[DW Germany Scraper] Successfully extracted {len(articles)} articles."
+        )
         return articles

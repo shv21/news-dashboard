@@ -1,36 +1,76 @@
+"""Database models module for News Aggregator.
+
+Defines SQLAlchemy ORM models and serialization helpers.
+"""
+
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional
+
 from database.database import db
 
-def utc_now():
+
+def utc_now() -> datetime:
+    """Return the current UTC timestamp without timezone offset.
+
+    Returns:
+        datetime: Naive UTC datetime object.
+    """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
+
 class News(db.Model):
-    """SQLAlchemy model representing a news article."""
-    __tablename__ = 'news'
+    """SQLAlchemy model representing a scraped news article in SQLite database."""
 
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    title = db.Column(db.String(255), nullable=False)
-    source = db.Column(db.String(100), nullable=False, index=True)
-    published_date = db.Column(db.DateTime, nullable=True, default=utc_now, index=True)
-    summary = db.Column(db.Text, nullable=True)
-    image_url = db.Column(db.Text, nullable=True)
-    article_url = db.Column(db.Text, unique=True, nullable=False)
-    country = db.Column(db.String(10), nullable=True, default='US', index=True)
-    created_at = db.Column(db.DateTime, default=utc_now)
+    __tablename__ = "news"
 
-    def to_dict(self):
-        """Serialize News model to a dictionary for API JSON responses."""
+    id: int = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    title: str = db.Column(db.String(255), nullable=False)
+    source: str = db.Column(db.String(100), nullable=False, index=True)
+    published_date: Optional[datetime] = db.Column(
+        db.DateTime, nullable=True, default=utc_now, index=True
+    )
+    summary: Optional[str] = db.Column(db.Text, nullable=True)
+    image_url: Optional[str] = db.Column(db.Text, nullable=True)
+    article_url: str = db.Column(db.Text, unique=True, nullable=False)
+    country: Optional[str] = db.Column(
+        db.String(10), nullable=True, default="US", index=True
+    )
+    created_at: Optional[datetime] = db.Column(db.DateTime, default=utc_now)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize News model instance to a dictionary for API JSON responses.
+
+        Returns:
+            Dict[str, Any]: Dictionary containing article attribute values.
+        """
+        pub_date_str: Optional[str] = (
+            self.published_date.strftime("%Y-%m-%d %H:%M:%S")
+            if self.published_date
+            else None
+        )
+        created_str: Optional[str] = (
+            self.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            if self.created_at
+            else None
+        )
+
         return {
-            'id': self.id,
-            'title': self.title,
-            'source': self.source,
-            'published_date': self.published_date.strftime('%Y-%m-%d %H:%M:%S') if self.published_date else None,
-            'summary': self.summary,
-            'image_url': self.image_url,
-            'article_url': self.article_url,
-            'country': self.country or 'US',
-            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None
+            "id": self.id,
+            "title": self.title,
+            "source": self.source,
+            "published_date": pub_date_str,
+            "summary": self.summary,
+            "image_url": self.image_url,
+            "article_url": self.article_url,
+            "country": self.country or "US",
+            "created_at": created_str,
         }
 
-    def __repr__(self):
-        return f"<News id={self.id} title='{self.title[:30]}' source='{self.source}'>"
+    def __repr__(self) -> str:
+        """Return string representation of News model.
+
+        Returns:
+            str: Developer-friendly string representation.
+        """
+        title_snippet: str = self.title[:30] if self.title else ""
+        return f"<News id={self.id} title='{title_snippet}' source='{self.source}'>"

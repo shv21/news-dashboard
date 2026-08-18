@@ -2,41 +2,57 @@
 
 A modular, scalable, full-stack web application built with **Python 3.12+**, **Flask**, **SQLAlchemy**, **BeautifulSoup4**, **Feedparser**, **SQLite**, **Bootstrap 5**, and **Vanilla JavaScript**. 
 
-The application automatically collects news articles from multiple news sources (BBC News, TechCrunch), prevents duplicate entries using unique article URLs, persists the news in SQLite, provides RESTful API endpoints, and presents a responsive, modern web interface.
+The application automatically collects news articles from multiple news sources across global regions (BBC News, TechCrunch, The Verge, Wired, Times of India, CBC News, ABC News Australia, DW News Germany, Japan Today), prevents duplicate entries using unique article URLs, persists news in SQLite, synchronizes organized data to Google Sheets, provides RESTful API endpoints, and presents a responsive, modern web interface.
 
 ---
 
 ## ✨ Features
 
-- **Multi-Source News Scraping**: Automatically parses news feeds from BBC News and TechCrunch using BeautifulSoup4 & Feedparser.
+- **Multi-Source News Scraping**: Automatically parses news feeds from 9 international news sources using BeautifulSoup4 & Feedparser.
 - **Duplicate Prevention**: Enforces database-level URL uniqueness constraints to prevent duplicate entries.
-- **RESTful API**: Exposes JSON endpoints for fetching news, filtering by source, searching by keyword, and manually triggering scrapers.
+- **Google Sheets Sync**: Automatically formats and syncs scraped news entries to Google Sheets with automatic category classification.
+- **Financial Market Data**: Provides real-time financial market data and metrics for major international banking institutions.
+- **RESTful API**: Exposes JSON endpoints for fetching news, filtering by source/country, searching by keyword, fetching bank financials, and triggering scrapers.
 - **Modern Responsive Frontend**: Built with Bootstrap 5 and custom CSS featuring glassmorphism headers, card hover animations, and toast notifications.
 - **Live Search & Filter**: Instant keyword search, news source dropdown filtering, and sorting (Newest / Oldest).
-- **Pagination**: Client and server-side pagination support.
-- **Manual Scrape Trigger**: Web UI button to trigger scraping on demand with live progress spinners.
-- **Unit Testing Suite**: Comprehensive unit tests covering database models, scrapers, and REST endpoints.
+- **PEP 8 & Type Annotated**: Codebase complies with PEP 8 standards, static type hints, Google-style docstrings, structured logging, and custom exception handling.
+- **Unit Testing Suite**: Comprehensive unit tests covering database models, scrapers, Google Sheets integration, and REST endpoints.
 
 ---
 
 ## 📁 Project Structure
 
 ```
-news-aggregator/
-├── app.py                     # Main Flask application initialization & error handlers
-├── config.py                  # Central configuration (DB URI, scraper timeouts, page size)
+news-dashboard/
+├── app.py                     # Main Flask application initialization & background thread
+├── config.py                  # Central configuration (DB URI, RSS feed URLs, scraper settings)
+├── exceptions.py              # Custom exception hierarchy (ScraperError, DatabaseError, etc.)
+├── utils.py                   # Shared helper utilities (datetime parsing, HTML cleaning, category classification)
 ├── requirements.txt           # Python project dependencies
 ├── README.md                  # Project documentation
 ├── .gitignore                 # Git ignore configuration
 ├── database/
+│   ├── __init__.py            # Database package exports
 │   ├── models.py              # SQLAlchemy News model definition
 │   └── database.py            # SQLAlchemy database engine and session binding
 ├── scraper/
-│   ├── scraper_one.py         # BBC News RSS & HTML scraper
-│   ├── scraper_two.py         # TechCrunch RSS & HTML scraper
-│   └── scraper_manager.py     # Central orchestrator for scrapers, retry logic, & deduplication
+│   ├── __init__.py            # Scraper package exports
+│   ├── scraper_manager.py     # Central orchestrator for scrapers & deduplication
+│   ├── scraper_one.py         # BBC News (UK) scraper
+│   ├── scraper_two.py         # TechCrunch (US) scraper
+│   ├── scraper_three.py       # The Verge (US) scraper
+│   ├── scraper_four.py        # Wired (US) scraper
+│   ├── scraper_five.py        # Times of India (IN) scraper
+│   ├── scraper_six.py         # CBC News (CA) scraper
+│   ├── scraper_seven.py       # ABC News (AU) scraper
+│   ├── scraper_eight.py       # DW News (DE) scraper
+│   └── scraper_nine.py        # Japan Today (JP) scraper
+├── services/
+│   ├── __init__.py            # Services package exports
+│   └── google_sheets_service.py # Service for syncing articles to Google Sheets
 ├── routes/
-│   ├── api.py                 # REST API endpoints (/api/news, /api/source/<source>, /api/scrape)
+│   ├── __init__.py            # Routes package exports
+│   ├── api.py                 # REST API endpoints (/api/news, /api/financials, /api/scrape)
 │   └── views.py               # HTML template view routes
 ├── templates/
 │   ├── base.html              # Base Jinja2 layout (Navbar, Footer, Toasts)
@@ -49,10 +65,12 @@ news-aggregator/
 │   └── js/
 │       └── app.js             # Client JavaScript controller (API calls, UI updates)
 ├── data/
-│   └── news.db                # SQLite database file (generated automatically)
+│   └── news.db                # SQLite database file
 └── tests/
+    ├── __init__.py            # Test package exports
     ├── test_models.py         # Unit tests for ORM models
     ├── test_api.py            # Unit tests for REST API endpoints
+    ├── test_google_sheets.py  # Unit tests for Google Sheets synchronization
     └── test_scrapers.py       # Unit tests for scraper module
 ```
 
@@ -119,6 +137,7 @@ The application exposes the following JSON REST API endpoints:
 | `/api/news/<id>` | `GET` | Get detailed information for a single news item | `/api/news/1` |
 | `/api/source/<source>` | `GET` | Get news articles by source name | `/api/source/BBC%20News` |
 | `/api/sources` | `GET` | List all available news sources & item counts | `/api/sources` |
+| `/api/financials` | `GET` | Get banking financial market data by country | `?country=IN` or `?country=US` |
 | `/api/scrape` | `POST` | Trigger manual news scraping on all registered scrapers | None |
 
 ### Example Response (`GET /api/news`):
@@ -141,6 +160,7 @@ The application exposes the following JSON REST API endpoints:
       "summary": "Sample summary text extracted from the RSS news feed...",
       "image_url": "https://example.com/image.jpg",
       "article_url": "https://www.bbc.com/news/articles/example",
+      "country": "UK",
       "created_at": "2026-07-28 15:00:00"
     }
   ]
@@ -154,14 +174,13 @@ The application exposes the following JSON REST API endpoints:
 To run the automated test suite with `pytest`:
 
 ```bash
-pytest -v
+python -m pytest
 ```
 
 ---
 
 ## 🔮 Future Improvements
 
-- Add asynchronous background scraping using Celery or APScheduler.
 - Add user account authentication & saved favorite articles.
-- Add additional news source scrapers (CNN, Reuters, Hacker News API).
+- Add real-time WebSocket notifications for breaking news events.
 - Implement Natural Language Processing (NLP) sentiment analysis and topic categorization.

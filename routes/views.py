@@ -4,7 +4,7 @@ Provides Flask Blueprints for serving HTML frontend web pages.
 """
 
 import logging
-from typing import List, Union
+from typing import List, Optional, Union
 
 from flask import Blueprint, Response, abort, render_template
 
@@ -34,8 +34,8 @@ def index() -> Union[str, Response]:
             .all()
         )
         total_count: int = News.query.count()
-    except Exception as e:
-        logger.error(f"Error querying database for dashboard view: {e}")
+    except Exception as exc:
+        logger.error(f"Error querying database for dashboard view: {exc}")
         source_list = []
         initial_news = []
         total_count = 0
@@ -59,11 +59,12 @@ def article_detail(news_id: int) -> Union[str, Response]:
         Union[str, Response]: Rendered HTML template or HTTP 404 response.
     """
     try:
-        article: Union[News, None] = db.session.get(News, news_id)
+        article: Optional[News] = db.session.get(News, news_id)
         if not article:
-            logger.warning(f"Article detail requested for non-existent ID {news_id}")
+            logger.warning(f"Article detail requested for missing ID {news_id}")
             abort(404)
         return render_template("article.html", article=article)
-    except Exception as e:
-        logger.error(f"Error serving article detail for ID {news_id}: {e}")
+    except Exception as exc:
+        logger.error(f"Error serving article detail for ID {news_id}: {exc}")
         abort(404)
+

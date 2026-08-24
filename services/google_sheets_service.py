@@ -15,6 +15,10 @@ from utils import classify_category
 
 logger = logging.getLogger(__name__)
 
+# Header row visual styling configuration
+HEADER_BG_COLOR: Dict[str, float] = {"red": 0.12, "green": 0.16, "blue": 0.23}
+HEADER_TEXT_COLOR: Dict[str, float] = {"red": 1.0, "green": 1.0, "blue": 1.0}
+
 
 class GoogleSheetsService:
     """Service to handle appending scraped news articles to Google Sheets."""
@@ -38,19 +42,19 @@ class GoogleSheetsService:
         self.worksheet: Optional[Any] = None
         self._init_sheets()
 
-    def _init_sheets(self) -> None:
-        """Initialize connection to Google Sheets API using service account credentials."""
-        credentials_file: str = Config.GOOGLE_CREDENTIALS_FILE
-        sheet_id: str = Config.GOOGLE_SHEET_ID
-        sheet_name: str = Config.GOOGLE_SHEET_NAME
-        worksheet_name: str = Config.GOOGLE_WORKSHEET_NAME
+    def _authorize_credentials(self) -> Optional[Any]:
+        """Load service account credentials and authorize gspread client.
 
+        Returns:
+            Optional[Any]: Authorized gspread Client object or None.
+        """
+        credentials_file: str = Config.GOOGLE_CREDENTIALS_FILE
         if not os.path.exists(credentials_file):
             logger.info(
                 f"[GoogleSheets] Credentials file '{credentials_file}' not found. "
                 "Google Sheets upload will be skipped."
             )
-            return
+            return None
 
         try:
             import gspread
@@ -63,81 +67,108 @@ class GoogleSheetsService:
             creds = Credentials.from_service_account_file(
                 credentials_file, scopes=scopes
             )
-            self.client = gspread.authorize(creds)
+            return gspread.authorize(creds)
+        except Exception as exc:
+            logger.error(f"[GoogleSheets] Authorization failed: {exc}")
+            return None
 
-            # Open spreadsheet by Name first, or fallback to sheet_id
-            try:
-                if sheet_name:
-                    self.sheet = self.client.open(sheet_name)
-                elif sheet_id:
-                    self.sheet = self.client.open_by_key(sheet_id)
-            except gspread.exceptions.SpreadsheetNotFound:
-                if sheet_id:
-                    try:
-                        self.sheet = self.client.open_by_key(sheet_id)
-                    except Exception as err:
-                        logger.error(
-                            f"[GoogleSheets] Spreadsheet '{sheet_name}' not found: {err}"
-                        )
-                        return
-                else:
-                    logger.error(
-                        f"[GoogleSheets] Spreadsheet '{sheet_name}' not found."
-                    )
-                    return
-            except Exception as e:
-                err_str: str = str(e)
-                if (
-                    "drive.googleapis.com" in err_str
-                    or "Google Drive API" in err_str
-                ):
-                    logger.error(
-                        "[GoogleSheets] Google Drive API is disabled in Google Cloud."
-                    )
-                else:
-                    logger.error(
-                        f"[GoogleSheets] Failed to open spreadsheet '{sheet_name}': {e}"
-                    )
-                return
+    def _open_spreadsheet(self, client: Any) -> Optional[Any]:
+        """Open Google spreadsheet by name or sheet ID key.
 
-            # Open or create worksheet
-            try:
-                self.worksheet = self.sheet.worksheet(worksheet_name)
-            except gspread.exceptions.WorksheetNotFound:
-                logger.info(
-                    f"[GoogleSheets] Worksheet '{worksheet_name}' missing. Creating..."
+        Args:
+            client (Any): Authorized gspread Client.
+
+        Returns:
+            Optional[Any]: Opened Spreadsheet object or None.
+        """
+        sheet_id: str = Config.GOOGLE_SHEET_ID
+        sheet_name: str = Config.GOOGLE_SHEET_NAME
+
+        try:
+            if sheet_name:
+                return client.open(sheet_name)
+            if sheet_id:
+                return client.open_by_key(sheet_id)
+        except Exception as err:
+            if sheet_id:
+                try:
+                    return client.open_by_key(sheet_id)
+                except Exception as inner_err:
+                    logger.error(
+                        f"[GoogleSheets] Could not open sheet by ID: {inner_err}"
+                    )
+            else:
+                logger.error(
+                    f"[GoogleSheets] Failed to open spreadsheet '{sheet_name}': {err}"
                 )
-                self.worksheet = self.sheet.add_worksheet(
+        return None
+
+    def _get_or_create_worksheet(self, sheet: Any) -> Optional[Any]:
+        """Access or create target worksheet tab.
+
+        Args:
+            sheet (Any): gspread Spreadsheet object.
+
+        Returns:
+            Optional[Any]: Worksheet object or None.
+        """
+        import gspread
+
+        worksheet_name: str = Config.GOOGLE_WORKSHEET_NAME
+        try:
+            return sheet.worksheet(worksheet_name)
+        except gspread.exceptions.WorksheetNotFound:
+            logger.info(
+                f"[GoogleSheets] Worksheet '{worksheet_name}' missing. Creating tab..."
+            )
+            try:
+                return sheet.add_worksheet(
                     title=worksheet_name, rows=1000, cols=len(self.HEADERS)
                 )
-            except Exception as e:
+            except Exception as create_err:
                 logger.error(
-                    f"[GoogleSheets] Failed to access worksheet '{worksheet_name}': {e}"
+                    f"[GoogleSheets] Failed to create worksheet '{worksheet_name}': {create_err}"
                 )
-                return
-
-            # Ensure headers exist and are formatted
-            try:
-                existing_headers = self.worksheet.row_values(1)
-                if not existing_headers or existing_headers != self.HEADERS:
-                    self.setup_formatted_header()
-            except Exception as e:
-                logger.warning(
-                    f"[GoogleSheets] Could not check header row: {e}"
-                )
-
-            self.enabled = True
-            logger.info(
-                f"[GoogleSheets] Connected to Sheet '{sheet_name}' "
-                f"(Worksheet: '{worksheet_name}')."
+        except Exception as exc:
+            logger.error(
+                f"[GoogleSheets] Failed to access worksheet '{worksheet_name}': {exc}"
             )
+        return None
 
-        except Exception as e:
-            logger.error(f"[GoogleSheets] Authentication failed: {e}")
+    def _init_sheets(self) -> None:
+        """Establish connection to Google Sheets API and prepare worksheet."""
+        client = self._authorize_credentials()
+        if not client:
             self.enabled = False
+            return
+
+        self.client = client
+        self.sheet = self._open_spreadsheet(client)
+        if not self.sheet:
+            self.enabled = False
+            return
+
+        self.worksheet = self._get_or_create_worksheet(self.sheet)
+        if not self.worksheet:
+            self.enabled = False
+            return
+
+        # Ensure header row styling
+        try:
+            existing_headers = self.worksheet.row_values(1)
+            if not existing_headers or existing_headers != self.HEADERS:
+                self.setup_formatted_header()
+        except Exception as err:
+            logger.warning(f"[GoogleSheets] Could not verify header row: {err}")
+
+        self.enabled = True
+        logger.info(
+            f"[GoogleSheets] Connected to Sheet '{Config.GOOGLE_SHEET_NAME}' "
+            f"(Worksheet: '{Config.GOOGLE_WORKSHEET_NAME}')."
+        )
 
     def setup_formatted_header(self) -> None:
-        """Set up row 1 with headers, dark navy background, bold white text, and freeze row 1."""
+        """Set up row 1 headers with dark navy background, bold white text, and freeze row 1."""
         if not self.worksheet:
             return
         try:
@@ -151,29 +182,21 @@ class GoogleSheetsService:
                 {
                     "textFormat": {
                         "bold": True,
-                        "foregroundColor": {
-                            "red": 1.0,
-                            "green": 1.0,
-                            "blue": 1.0,
-                        },
+                        "foregroundColor": HEADER_TEXT_COLOR,
                     },
-                    "backgroundColor": {
-                        "red": 0.12,
-                        "green": 0.16,
-                        "blue": 0.23,
-                    },
+                    "backgroundColor": HEADER_BG_COLOR,
                     "horizontalAlignment": "LEFT",
                 },
             )
-            logger.info("[GoogleSheets] Formatted header row styling applied.")
+            logger.info("[GoogleSheets] Header row styling applied successfully.")
         except Exception as e:
             logger.warning(f"[GoogleSheets] Header styling warning: {e}")
 
     def get_existing_urls(self) -> Set[str]:
-        """Fetch set of URLs currently present in the Google Sheet (Column 6: URL).
+        """Fetch set of article URLs currently in the Google Sheet (Column 6).
 
         Returns:
-            Set[str]: Set of article URLs existing in worksheet.
+            Set[str]: Set of article URLs present in worksheet.
         """
         if not self.enabled or not self.worksheet:
             return set()
@@ -189,7 +212,7 @@ class GoogleSheetsService:
     def classify_article_category(
         self, title: str, summary: str, url: str
     ) -> str:
-        """Automatically classify article into categories using utility helper.
+        """Classify article into news category using shared utility helper.
 
         Args:
             title (str): Article title.
@@ -197,7 +220,7 @@ class GoogleSheetsService:
             url (str): Article URL.
 
         Returns:
-            str: Category string.
+            str: Category name string.
         """
         return classify_category(title, summary, url)
 
@@ -228,7 +251,7 @@ class GoogleSheetsService:
             "category"
         ) or self.classify_article_category(title, summary, url)
 
-        # Author mapping
+        # Author resolution rules
         if source == "BBC News":
             author: str = art.get("author") or "BBC Newsroom"
         elif source == "Times of India":
@@ -346,3 +369,4 @@ class GoogleSheetsService:
                 f"[GoogleSheets] Failed to reorganize sheet: {e}", exc_info=True
             )
             return False
+

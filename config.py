@@ -1,8 +1,8 @@
-"""Application configuration module for Flask and scrapers.
+"""Application configuration module for Flask News Aggregator.
 
 Loads environment variables from `.env` and defines configuration settings
-including database URIs, scraper settings, Google Sheets integration details,
-and stock market data configurations.
+including database URIs, scraper thresholds, RSS feed endpoints, Google Sheets
+integration details, and banking financial market data.
 """
 
 import os
@@ -17,12 +17,13 @@ load_dotenv()
 # Base directory of application
 BASE_DIR: Path = Path(__file__).resolve().parent
 
-# Check if running in Vercel serverless environment
+# Serverless environment detection (e.g. Vercel)
 IS_VERCEL: bool = (
     os.environ.get("VERCEL") == "1"
     or os.environ.get("VERCEL_ENV") is not None
 )
 
+# Select writable data storage directory based on environment
 if IS_VERCEL:
     DATA_DIR: Path = Path("/tmp")
 else:
@@ -35,20 +36,24 @@ except Exception:
 
 
 class Config:
-    """Central configuration class for Flask application and system components."""
+    """Central configuration repository for Flask application and scraper services."""
 
+    # -------------------------------------------------------------------------
+    # Core Flask & Database Settings
+    # -------------------------------------------------------------------------
     SECRET_KEY: str = os.environ.get(
         "SECRET_KEY", "news-aggregator-secret-key-2026"
     )
 
-    # SQLite Database URI
     DB_FILE: str = (DATA_DIR / "news.db").resolve().as_posix()
     SQLALCHEMY_DATABASE_URI: str = os.environ.get(
         "DATABASE_URL", f"sqlite:///{DB_FILE}"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS: bool = False
 
-    # Scraper general settings
+    # -------------------------------------------------------------------------
+    # Web Scraper Configuration
+    # -------------------------------------------------------------------------
     SCRAPER_REQUEST_TIMEOUT: int = int(
         os.environ.get("SCRAPER_REQUEST_TIMEOUT", "10")
     )
@@ -62,7 +67,9 @@ class Config:
         ),
     )
 
-    # Scraper RSS Feed URLs
+    # -------------------------------------------------------------------------
+    # RSS Feed Source Endpoints
+    # -------------------------------------------------------------------------
     RSS_URL_BBC: str = os.environ.get(
         "RSS_URL_BBC", "https://feeds.bbci.co.uk/news/rss.xml"
     )
@@ -92,10 +99,14 @@ class Config:
         "RSS_URL_JAPAN_TODAY", "https://japantoday.com/feed"
     )
 
-    # Pagination
+    # -------------------------------------------------------------------------
+    # Dashboard & UI Pagination Settings
+    # -------------------------------------------------------------------------
     ITEMS_PER_PAGE: int = int(os.environ.get("ITEMS_PER_PAGE", "9"))
 
-    # Google Sheets Integration
+    # -------------------------------------------------------------------------
+    # Google Sheets API Integration
+    # -------------------------------------------------------------------------
     GOOGLE_CREDENTIALS_FILE: str = os.environ.get(
         "GOOGLE_CREDENTIALS_FILE", "credentials.json"
     )
@@ -107,7 +118,9 @@ class Config:
         "GOOGLE_WORKSHEET_NAME", "News"
     )
 
-    # Banking Financial Institutions Data Config
+    # -------------------------------------------------------------------------
+    # Financial Market Data (Banking Institutions)
+    # -------------------------------------------------------------------------
     FINANCIALS_BY_COUNTRY: Dict[str, List[Dict[str, Any]]] = {
         "IN": [
             {

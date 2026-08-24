@@ -5,146 +5,144 @@ URL validation, article category classification, and seed image generation.
 """
 
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 import hashlib
 import re
 import time
-from typing import Any, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from bs4 import BeautifulSoup
 import requests
 
 from config import Config
 
+# Category classification regex rules: (URL Pattern, Keyword Pattern, Category Name)
+CATEGORY_RULES: Tuple[Tuple[str, str, str], ...] = (
+    (
+        r"/(sport|sports)/",
+        r"\b(sport|sports|football|cricket|match|league|olympics|player|"
+        r"stadium|tournament|championship|tennis|golf|f1|premier league)\b",
+        "Sports",
+    ),
+    (
+        r"/(culture|entertainment|lifestyle)/",
+        r"\b(culture|cultural|film|movie|music|art|arts|actor|actress|novel|"
+        r"cinema|festival|theater|theatre|fashion|heritage|celebrity)\b",
+        "Culture & Arts",
+    ),
+    (
+        r"/(tech|technology|science)/",
+        r"\b(tech|technology|ai|artificial intelligence|software|hardware|"
+        r"robot|robotics|cyber|space|satellite|gadget)\b",
+        "Technology",
+    ),
+    (
+        r"/(business|economy|finance)/",
+        r"\b(business|economy|economic|stock|stocks|market|markets|trade|"
+        r"finance|financial|company|inflation|bank|banking|ceo)\b",
+        "Business",
+    ),
+    (
+        r"/(politics|news)/",
+        r"\b(politics|political|minister|election|parliament|government|"
+        r"president|pm|vote|court|law|diplomacy|military|war)\b",
+        "Politics",
+    ),
+)
+
 
 def clean_html_text(html_content: Optional[str]) -> str:
-    """Extract plain text from an HTML snippet using BeautifulSoup.
+    """Extract clean plain text from an HTML snippet using BeautifulSoup.
 
     Args:
-        html_content (Optional[str]): HTML string to strip tags from.
+        html_content (Optional[str]): HTML markup or text string.
 
     Returns:
-        str: Cleaned plain text, or default string if input is empty.
+        str: Stripped plain text string, or default fallback if empty.
     """
     if not html_content or not html_content.strip():
         return "No summary available."
 
-    soup = BeautifulSoup(html_content, "html.parser")
+    soup: BeautifulSoup = BeautifulSoup(html_content, "html.parser")
     return soup.get_text().strip()
 
 
 def parse_datetime(parsed_entry: Any) -> datetime:
-    """Extract and parse publication date into a UTC datetime object.
+    """Extract and convert publication timestamp from an RSS feed entry into UTC.
+
+    Checks `published_parsed`, `updated_parsed`, and RFC date strings in order.
+    Returns current naive UTC datetime as a safe fallback.
 
     Args:
-        parsed_entry (Any): RSS feed entry object from feedparser.
+        parsed_entry (Any): RSS feed entry dictionary/object from feedparser.
 
     Returns:
-        datetime: Parsed publication datetime, or current UTC time on fallback.
+        datetime: Parsed naive UTC datetime object.
     """
-    if (
-        hasattr(parsed_entry, "published_parsed")
-        and parsed_entry.published_parsed
-    ):
-        try:
-            return datetime.fromtimestamp(
-                time.mktime(parsed_entry.published_parsed)
-            )
-        except (ValueError, OverflowError, TypeError):
-            pass
+    # 1. Try structured time tuples (published_parsed or updated_parsed)
+    for attr in ("published_parsed", "updated_parsed"):
+        time_struct = getattr(parsed_entry, attr, None)
+        if time_struct:
+            try:
+                return datetime.fromtimestamp(time.mktime(time_struct))
+            except (ValueError, OverflowError, TypeError):
+                continue
 
-    if hasattr(parsed_entry, "updated_parsed") and parsed_entry.updated_parsed:
+    # 2. Try raw string dates (e.g. published attribute)
+    published_str = getattr(parsed_entry, "published", None)
+    if published_str and isinstance(published_str, str):
         try:
-            return datetime.fromtimestamp(
-                time.mktime(parsed_entry.updated_parsed)
-            )
-        except (ValueError, OverflowError, TypeError):
-            pass
-
-    if hasattr(parsed_entry, "published") and parsed_entry.published:
-        try:
-            from email.utils import parsedate_to_datetime
-
-            return parsedate_to_datetime(parsed_entry.published)
+            return parsedate_to_datetime(published_str)
         except Exception:
             pass
 
+    # 3. Fallback to current UTC time
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def is_valid_url(url: str, timeout: Optional[int] = None) -> bool:
-    """Verify whether an article URL is reachable and does not return HTTP 404.
+    """Verify whether an article URL is accessible via HTTP HEAD request.
 
     Args:
-        url (str): Target URL to validate via HTTP HEAD request.
+        url (str): Target URL string.
         timeout (Optional[int]): Request timeout in seconds. Defaults to Config timeout.
 
     Returns:
-        bool: True if URL is accessible or non-404; False if HTTP 404.
+        bool: False if URL returns HTTP 404; True otherwise (assumed valid on timeout).
     """
     if not url or not url.strip():
         return False
 
     req_timeout: int = timeout or Config.SCRAPER_REQUEST_TIMEOUT
-    headers: dict[str, str] = {"User-Agent": Config.SCRAPER_USER_AGENT}
+    headers: Dict[str, str] = {"User-Agent": Config.SCRAPER_USER_AGENT}
 
     try:
-        response = requests.head(
+        response: requests.Response = requests.head(
             url, headers=headers, timeout=req_timeout, allow_redirects=True
         )
         return response.status_code != 404
     except Exception:
-        # Assume valid on network timeout to prevent dropping live feeds
+        # Preserve live feeds on network timeout or connection reset
         return True
 
 
 def classify_category(title: str, summary: str, url: str) -> str:
-    """Classify an article into a news category based on keywords and URL structure.
+    """Classify a news article into a category based on URL and text keywords.
 
     Args:
-        title (str): Article headline.
-        summary (str): Article summary or excerpt text.
+        title (str): Article headline text.
+        summary (str): Article summary excerpt.
         url (str): Article canonical URL.
 
     Returns:
-        str: Category name ('Sports', 'Culture & Arts', 'Technology', 'Business',
-            'Politics', or 'General').
+        str: Category string ('Sports', 'Culture & Arts', 'Technology',
+            'Business', 'Politics', or 'General').
     """
-    text: str = f"{title} {summary or ''} {url}".lower()
+    search_text: str = f"{title} {summary or ''} {url}".lower()
 
-    if re.search(r"/(sport|sports)/", url) or re.search(
-        r"\b(sport|sports|football|cricket|match|league|olympics|player|"
-        r"stadium|tournament|championship|tennis|golf|f1|premier league)\b",
-        text,
-    ):
-        return "Sports"
-
-    if re.search(r"/(culture|entertainment|lifestyle)/", url) or re.search(
-        r"\b(culture|cultural|film|movie|music|art|arts|actor|actress|novel|"
-        r"cinema|festival|theater|theatre|fashion|heritage|celebrity)\b",
-        text,
-    ):
-        return "Culture & Arts"
-
-    if re.search(r"/(tech|technology|science)/", url) or re.search(
-        r"\b(tech|technology|ai|artificial intelligence|software|hardware|"
-        r"robot|robotics|cyber|space|satellite|gadget)\b",
-        text,
-    ):
-        return "Technology"
-
-    if re.search(r"/(business|economy|finance)/", url) or re.search(
-        r"\b(business|economy|economic|stock|stocks|market|markets|trade|"
-        r"finance|financial|company|inflation|bank|banking|ceo)\b",
-        text,
-    ):
-        return "Business"
-
-    if re.search(r"/(politics|news)/", url) or re.search(
-        r"\b(politics|political|minister|election|parliament|government|"
-        r"president|pm|vote|court|law|diplomacy|military|war)\b",
-        text,
-    ):
-        return "Politics"
+    for url_pattern, text_pattern, category_name in CATEGORY_RULES:
+        if re.search(url_pattern, url) or re.search(text_pattern, search_text):
+            return category_name
 
     return "General"
 
@@ -152,15 +150,16 @@ def classify_category(title: str, summary: str, url: str) -> str:
 def generate_seed_image_url(
     seed_key: str, width: int = 600, height: int = 400
 ) -> str:
-    """Generate a deterministic seed-based image URL for article image fallbacks.
+    """Generate a deterministic image URL based on MD5 hash of seed string.
 
     Args:
-        seed_key (str): Unique string key (e.g. article URL or title).
-        width (int): Target image width in pixels. Defaults to 600.
-        height (int): Target image height in pixels. Defaults to 400.
+        seed_key (str): Unique seed key (e.g. article URL or headline).
+        width (int): Image width in pixels. Defaults to 600.
+        height (int): Image height in pixels. Defaults to 400.
 
     Returns:
-        str: Seeded image URL.
+        str: Deterministic Picsum image URL.
     """
     url_hash: str = hashlib.md5(seed_key.encode("utf-8")).hexdigest()
     return f"https://picsum.photos/seed/{url_hash}/{width}/{height}"
+

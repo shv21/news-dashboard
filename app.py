@@ -1,7 +1,7 @@
 """Main application entrypoint module for Flask News Aggregator.
 
 Initializes Flask application, binds extensions, configures CORS, registers
-blueprints, and spawns the background news scraper thread.
+blueprints, and spawns the background news scraper daemon thread.
 """
 
 import logging
@@ -18,7 +18,7 @@ from routes.api import api_bp
 from routes.views import views_bp
 from scraper.scraper_manager import ScraperManager
 
-# Configure logging
+# Configure root logger format
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -36,7 +36,7 @@ def start_background_scraper(
         interval_seconds (int): Sleep duration between scrape cycles in seconds.
 
     Returns:
-        threading.Thread: Started background scraper thread object.
+        threading.Thread: Started background scraper daemon thread object.
     """
 
     def run_loop() -> None:
@@ -49,11 +49,11 @@ def start_background_scraper(
                     stats: Dict[str, Any] = manager.run_all_scrapers()
                     logger.info(
                         "[BackgroundScraper] Cycle complete: "
-                        f"{stats['new_added']} new articles added to DB & Sheets."
+                        f"{stats.get('new_added', 0)} new articles added."
                     )
-            except Exception as e:
+            except Exception as exc:
                 logger.error(
-                    f"[BackgroundScraper] Unexpected error during update: {e}"
+                    f"[BackgroundScraper] Unexpected error during update: {exc}"
                 )
 
             time.sleep(interval_seconds)
@@ -67,7 +67,7 @@ def create_app(test_config: Optional[Dict[str, Any]] = None) -> Flask:
     """Application factory for Flask News Aggregator dashboard.
 
     Args:
-        test_config (Optional[Dict[str, Any]]): Optional testing configuration.
+        test_config (Optional[Dict[str, Any]]): Optional testing configuration dict.
 
     Returns:
         Flask: Configured Flask application instance.
@@ -77,14 +77,14 @@ def create_app(test_config: Optional[Dict[str, Any]] = None) -> Flask:
     if test_config:
         app.config.update(test_config)
 
-    # Initialize Database
+    # Initialize SQLite Database & Tables
     init_db(app)
 
     # Register Blueprints
     app.register_blueprint(api_bp)
     app.register_blueprint(views_bp)
 
-    # Enable CORS headers for API access
+    # Enable CORS headers for cross-origin API clients
     @app.after_request
     def add_cors_headers(response: Any) -> Any:
         response.headers["Access-Control-Allow-Origin"] = "*"
@@ -103,13 +103,13 @@ def create_app(test_config: Optional[Dict[str, Any]] = None) -> Flask:
 
     @app.errorhandler(500)
     def internal_server_error(e: Any) -> Any:
-        logger.error(f"500 Internal Error: {e}")
+        logger.error(f"500 Internal Server Error: {e}")
         return (
             jsonify({"success": False, "error": "Internal server error"}),
             500,
         )
 
-    # Start automatic background scraper if not in TESTING or VERCEL mode
+    # Start background scraper if not in TESTING or VERCEL environment
     is_vercel: bool = (
         os.environ.get("VERCEL") == "1"
         or os.environ.get("VERCEL_ENV") is not None
@@ -125,5 +125,6 @@ def create_app(test_config: Optional[Dict[str, Any]] = None) -> Flask:
 app: Flask = create_app()
 
 if __name__ == "__main__":
-    logger.info("Starting News Aggregator web application at http://127.0.0.1:5000")
+    logger.info("Starting News Aggregator application at http://127.0.0.1:5000")
     app.run(host="0.0.0.0", port=5000, debug=True)
+

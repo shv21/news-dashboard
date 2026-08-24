@@ -1,6 +1,6 @@
 """Database models module for News Aggregator.
 
-Defines SQLAlchemy ORM models and serialization helpers.
+Defines SQLAlchemy ORM models and dictionary serialization helpers for news articles.
 """
 
 from datetime import datetime, timezone
@@ -10,16 +10,16 @@ from database.database import db
 
 
 def utc_now() -> datetime:
-    """Return the current UTC timestamp without timezone offset.
+    """Return current naive UTC timestamp.
 
     Returns:
-        datetime: Naive UTC datetime object.
+        datetime: Current UTC datetime without timezone offset.
     """
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class News(db.Model):
-    """SQLAlchemy model representing a scraped news article in SQLite database."""
+    """SQLAlchemy model representing a scraped news article stored in SQLite."""
 
     __tablename__ = "news"
 
@@ -41,7 +41,7 @@ class News(db.Model):
         """Serialize News model instance to a dictionary for API JSON responses.
 
         Returns:
-            Dict[str, Any]: Dictionary containing article attribute values.
+            Dict[str, Any]: Dictionary containing all article attributes.
         """
         pub_date_str: Optional[str] = (
             self.published_date.strftime("%Y-%m-%d %H:%M:%S")
@@ -67,10 +67,7 @@ class News(db.Model):
         }
 
     def __repr__(self) -> str:
-        """Return string representation of News model.
-
-        Returns:
-            str: Developer-friendly string representation.
-        """
-        title_snippet: str = self.title[:30] if self.title else ""
+        """Return developer-friendly string representation of News object."""
+        title_snippet: str = self.title[:30] if self.title else "Untitled"
         return f"<News id={self.id} title='{title_snippet}' source='{self.source}'>"
+

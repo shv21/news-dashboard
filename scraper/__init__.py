@@ -3,6 +3,7 @@
 Provides news scraper orchestration manager and individual news source scrapers.
 """
 
+from scraper.base_scraper import BaseNewsScraper
 from scraper.scraper_eight import GermanyNewsScraper
 from scraper.scraper_five import IndiaNewsScraper
 from scraper.scraper_four import WiredScraper
@@ -15,6 +16,7 @@ from scraper.scraper_three import VergeScraper
 from scraper.scraper_two import TechCrunchScraper
 
 __all__ = [
+    "BaseNewsScraper",
     "ScraperManager",
     "BBCNewsScraper",
     "TechCrunchScraper",
@@ -26,3 +28,4 @@ __all__ = [
     "GermanyNewsScraper",
     "JapanNewsScraper",
 ]
+
